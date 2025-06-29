@@ -84,7 +84,7 @@ sudo tar xfv ./bb-kernel/deploy/${kernel_version}-modules.tar.gz -C /media/rootf
 sudo sh -c "echo '/dev/mmcblk0p1  /  auto  errors=remount-ro  0  1' >> /media/rootfs/etc/fstab"
 ``` 
 ### Networking
-- chinrn sửa file: /etc/network/interfaces
+- chỉnh sửa file: /etc/network/interfaces
 ``` shell
 sudo nano /media/rootfs/etc/network/interfaces
 ```
@@ -103,7 +103,7 @@ sudo umount /media/rootfs
 ``` 
 
 ## Build một chương trình sau khỉ build image thành công
-### lênh Rebuild
+### lệnh Rebuild
 ``` shell
 # user@ubuntu:~/bb-kernel$
 ./tools/rebuild.sh
