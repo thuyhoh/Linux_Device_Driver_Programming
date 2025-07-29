@@ -17,7 +17,7 @@ gcc -g -o binfile srcfile.c
     - Single-step debugging
     - View variable
 
-### 3. Basic command line
+### 3. Basic command line in GDB
 - load file into gdb
 ``` bash
 gdb ./binaryfile
@@ -103,16 +103,16 @@ core
 ``` bash
 sudo apt install -y valgrind
 ```
-### 2. Debugging with valgrind
+### 2. Compile a program to use with valgrind
+``` bash
+gcc -o binfile srcfile.c -Wall -ggdb3
+```
+### 3. Debugging with valgrind
 ``` bash
 valgrind --leak-check=yes ./binfile
 ```
 ``` bash
-valgrind --tool-memcheck --leak-check=yes --show-reachable=yes --num-callers=20 --track-fds=yes ./test
-```
-- compile
-``` bash
-gcc -o binfile srcfile.c -Wall -ggdb3
+valgrind --tool-memcheck --leak-check=yes --show-reachable=yes --num-callers=20 --track-fds=yes ./binfile
 ```
 
 ## III. Strace
