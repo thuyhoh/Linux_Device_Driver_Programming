@@ -11,3 +11,6 @@
 3. Character Device file
 4. GPIO Driver
 5. Create Sysfs for GPIO
+6. Device Tree
+7. Uboot
+8. Linux debugging
