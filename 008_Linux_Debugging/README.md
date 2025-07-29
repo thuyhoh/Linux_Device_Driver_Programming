@@ -75,8 +75,9 @@ set variable <var_name> = <value>
 
 ### 4. Debugging Coredumped
 #### 4.1. The problem
-- Code Dump/ Segmentation fault is a specific kind of error caused by accessing memory that "does not belong to you".
-- A core dump is a copy of process memory - the name comming from the era of magnetic core memory
+- Lỗi Code Dump/Segmentation là một loại lỗi cụ thể do truy cập bộ nhớ "không thuộc về bạn".
+- Core dump là bản sao của bộ nhớ tiến trình 
+- tên gọi này bắt nguồn từ thời đại bộ nhớ lõi.
 #### 4.2. Fixing Coredumped
 ``` bash
 > ulimit -c unlimited
@@ -114,53 +115,51 @@ valgrind --tool-memcheck --leak-check=yes --show-reachable=yes --num-callers=20 
 gcc -o binfile srcfile.c -Wall -ggdb3
 ```
 
-
-
 ## III. Strace
 ### 1. Installation 
 ``` bash
 sudo apt install -y strace
 ```
 ### 2. Debugging with Strace
-- Trace Linux command system calls
+1. Trace Linux command system calls
 ``` bash
 strace ls -l
 ```
-- Trace Linux Process PID
+2. Trace Linux Process PID
 ``` bash
 sudo strace -p PID
 ```
-- Get summary of Linux Process
+3. Get summary of Linux Process
 ``` bash
 sudo strace -c -p PID
 ```
-- Print Instrction Pointer During System call
+4. Print Instrction Pointer During System call
 ``` bash
 sudo strace -i ls -l
 ```
-- Show time of day for each trace output line 
+5. Show time of day for each trace output line 
 ``` bash
 sudo strace -t ls -l
 ```
-- Print command Tile spent in system calls
+6. Print command Tile spent in system calls
 ``` bash
 sudo strace -T ls -l
 ```
-- Trace only specific system calls
+7. Trace only specific system calls
 ``` bash
 sudo strace -e trace=write ls -l
 ```
-- Trace System call based cn and Certain condition 
+8. Trace System call based cn and Certain condition 
 ``` bash
 sudo strace -q -e trace=process ls -l
 sudo strace -q -e trace=file ls -l
 sudo strace -q -e trace=memoty ls -l
 ```
-- Redirect Trace Output to file
+9. Redirect Trace Output to file
 ``` bash
 sudo strace 0o df_debug.txt ls -l
 ```
-- show Some debugging output of strace
+10. show Some debugging output of strace
 ``` bash
 strace -d ls -l
 ```
