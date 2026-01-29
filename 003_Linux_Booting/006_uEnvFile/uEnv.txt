@@ -1,0 +1,4 @@
+mypcip=setenv serverip 192.168.1.2
+ipaddr = 192.168.27.1
+bootargs=console=ttyO0,115200 root=/dev/mmcblk0p2 rw
+bootcmd=echo"****************Boot from Memory****************";load mmc 1:2 0x82000000 /boot/uImage;load mmc 1:2 0x88000000 /boot/am335x-boneblack.dtb;bootm 0x82000000 - 0x88000000
