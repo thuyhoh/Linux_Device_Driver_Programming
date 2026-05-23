@@ -36,6 +36,9 @@ sudo apt-get install libssl-dev
 sudo apt-get install libgtk2.0-dev
 sudo apt-get install libglib2.0-dev
 sudo apt-get install libglade2-dev
+
+sudo apt-get install libmpc-dev
+sudo apt-get install libgmp3-dev
 ```
 - Clone uboot source code
 ``` shell

@@ -18,7 +18,6 @@ config and generating linux image -->
 # user@ubuntu:./$
 git clone https://github.com/RobertCNelson/bb-kernel
 cd bb-kernel/
-git checkout origin/am33x-v5.4 -b tmp
 ```
 - Build the first linux kernel
 ``` shell

@@ -52,9 +52,8 @@ int alloc_chrdev_region(dev_t *dev, unsigned baseminor, unsigned count, const ch
 void unregister_chrdev_region(dev_t from, unsigned count);
 ```
 
-## III. Char Device Registration
+## III. Cdev structure
 - `include/linux/cdev.h`
-- cdev struct
 ![P6](./imgs/P6.png)
 ### 1. THIS_MODULE macro
 - THIS_MODULE là một macro trong Linux kernel, dùng bên trong mã kernel module để chỉ chính module hiện tại.
@@ -96,11 +95,9 @@ int cdev_add(struct cdev *p, dev_t dev, unsigned count);
 cdev_del(struct cdev_t *cdev);
 ```
 
+
 ## IV. Device file
 - `include/linux/device.h`
-- Trong linux, ta có thể tạo device file một cách tự động 
-- Đối với mỗi file /sys/class/dev tượng trưng cho 
-#### udev 
 ### Create and register a class with sysfs
 ``` C
 /**
@@ -120,7 +117,7 @@ void class_destroy(struct class *cls);
 ```
 
 
-### Dynamic device file creation 
+### /dev/...
 ``` C
 /**
  * @param[in] class:	Con trỏ tới class mà bạn đã tạo từ class_create().
@@ -166,29 +163,5 @@ unsigned long copy_from_user(void *to, const void __user *from, unsigned long n)
 
 - `include/linux/uaccess.h`
 
-
-
-### open systemcall
-#### Inode object
- Unix makes a clear distinction between the contents of a file and the information 
-about a file
-• An inode is a VFS data structure(struct inode) that holds general information about a 
-file. 
-• Whereas VFS ‘file’ data structure (struct file) tracks interaction on an opened file by 
-the user process 
-• Inode contains all the information needed by the filesystem to handle a file.
-• Each file has its own inode object, which the filesystem uses to identify the file
-• Each inode object is associated with an inode number, which uniquely identifies the 
-file within the filesystem.
-• The inode object is created and stored in memory as and when a new file (regular or 
-device ) gets created
-#### File object
-Whenever a file is opened a file object is created in the kernel space . 
-There will one file object for every open of a regular or device file.
-• Stores information about the interaction between an open file and a 
-process
-• This information exists only in kernel memory during the period when 
-a process has the file open. The contents of file object is NOT written 
-back to disks unlike inode.
-### open systemcall sequance
+#### open method
 ![P3](./imgs/P3.png)
