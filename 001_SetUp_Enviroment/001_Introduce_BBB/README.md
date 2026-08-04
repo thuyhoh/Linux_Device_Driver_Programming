@@ -1,3 +1,0 @@
-# Introduction Beaglebone black board
-
-
