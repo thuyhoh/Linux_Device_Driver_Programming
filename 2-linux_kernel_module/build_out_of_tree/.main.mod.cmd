@@ -1,0 +1,1 @@
+cmd_/home/thuy/embedded/embedded_linux/ldd1/2-linux_kernel_module/build_out_of_tree/main.mod := { echo  /home/thuy/embedded/embedded_linux/ldd1/2-linux_kernel_module/build_out_of_tree/main.o;  echo; } > /home/thuy/embedded/embedded_linux/ldd1/2-linux_kernel_module/build_out_of_tree/main.mod

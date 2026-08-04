@@ -1,3 +1,0 @@
-
-017 Kernel-compilation-steps
-https://github.com/niekiran/linux-device-driver-1/blob/master/scripts/kernel_compilation_steps.txt
