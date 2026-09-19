@@ -1,25 +1,47 @@
-#
-
 # Device tree
 
 ## Introduction to the device tree
-khái niệm
-directory
+- Device Tree là một cấu trúc dữ liệu mô tả phần cứng (CPU, bus, thiết bị ngoại vi, địa chỉ, ngắt...) dưới dạng cây, tách biệt khỏi mã nguồn kernel — thay vì phải hard-code thông tin board vào file C như trước đây (arch/arm/mach-*/board-xxx.c), kernel Linux đọc thông tin phần cứng từ file này lúc boot.
 
 ## Syntax 
+![img](imgs/dts_node_hierarchy.png)
+
 ```
-include /path
-```
-```
-[label]: node-name[@unit-address] {
-    [properties definitions]
-    [child nodes]
+/dts-v1/;                          // khai báo phiên bản DT
+
+#include "soc-common.dtsi"         // include file dùng chung
+
+/ {                                 // root node
+    model = "My ARM Board";
+    compatible = "vendor,my-board";
+    #address-cells = <1>;
+    #size-cells = <1>;
+
+    soc {                           // node con, không có unit-address
+        compatible = "simple-bus";
+        ranges;
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        serial0: serial@ff000000 {     // label: node-name@unit-address
+            compatible = "vendor,uart-v1";
+            reg = <0xff000000 0x1000>;
+            interrupt-parent = <&gic>;
+            interrupts = <0 53 4>;
+            clocks = <&clk_uart>;
+            status = "okay";
+        };
+    };
+
+    aliases {
+        serial0 = &serial0;         // tham chiếu qua phandle-label
+    };
 };
 ```
 ### 1. Cấu trúc Cây & Tên Node (Node Naming)
-![devicetree struct example](<Screenshot from 2026-08-01 21-13-29.png>)
+![devicetree struct example](imgs/devicetree_struct.png)
+
 - Devicetree được tổ chức dưới dạng danh sách liên kết phân cấp gồm các node (nút). Mỗi node đại diện cho một thiết bị phần cứng, một bus hoặc một thành phần logic.
-- 
 - cú pháp đặt tên Node:
 ``` dts
 node-name@unit-address
@@ -30,16 +52,10 @@ node-name@unit-address
 
 ### Các thộc tính và kiểu dữ liệu
 #### data type
-```
-Kiểu dữ liệu	Cú pháp trong DTS	Mô tả & Ví dụ
-Empty (Flag)	read-only;	Thuộc tính dạng cờ, sự xuất hiện của nó tương đương giá trị True.
-u32 / Cells	<0x1000 0x100>	Một hoặc nhiều ô số nguyên 32-bit (big-endian).
-String	"ns16550"	Chuỗi ký tự kết thúc bằng byte NUL.
-String list	"vendor,dev1", "vendor,dev2"	Danh sách chuỗi ký tự phân cách bằng dấu phẩy.
-Byte array	[00 0b 6b 2f 80 02]	Mảng các giá trị byte (viết ở dạng Hex).
-Phandle	<&label> hoặc <1>	Giá trị số 32-bit duy nhất dùng để tham chiếu chéo giữa các node.
-```
-#### property
+
+
+
+### Thuộc tính chuẩn
 - compatible
     - Chức năng: Thuộc tính quan trọng nhất dùng để ghép nối (match) thiết bị với driver tương ứng.
 
@@ -63,6 +79,7 @@ Phandle	<&label> hoặc <1>	Giá trị số 32-bit duy nhất dùng để tham c
 - Thuộc tính không chuẩn 
 ```
 [tiền tố ], tên thuộc tính = giá trị
+# vd: org,size = <1024>, icm,id = <0x68>
 ```
 
 
@@ -136,10 +153,31 @@ MODULE_DESCRIPTION("A pseudo character platform driver which handles n platform 
 ```
 
 ## Overlays
+![img](imgs\dt_overlay_merge_flow.png)
+```
+/dts-v1/;
+/plugin/;                              // đánh dấu đây là overlay, không phải dtb đầy đủ
+
+/ {
+    fragment@0 {
+        target = <&i2c1>;              // trỏ tới node đích trong base dtb (qua phandle)
+        // hoặc target-path = "/soc/i2c@ff020000";
+
+        __overlay__ {
+            status = "okay";           // bật node vốn đang disabled
+
+            temp_sensor: sensor@48 {
+                compatible = "vendor,tmp102";
+                reg = <0x48>;
+                status = "okay";
+            };
+        };
+    };
+};
+```
 
 
-
-## Chia sẻ dữ liệu giữa device tree và platform driver
+## Kernel API
 
 void *of_device_get_match_data(const struct device *dev);
 
@@ -158,12 +196,19 @@ CONFIG_OF
 ```
 
 
-![of_node](<Screenshot from 2026-07-31 22-50-54.png>)
+![of_node](imgs/<Screenshot from 2026-07-31 22-50-54.png>)
 
-## Compile dtsi 
+## Compiler
+- Compile device tree 
 ``` shell
 # ~/bb-kernel/KERNEL
-make 
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- dtbs
+# đổi dtbs thành các file biên dịch trong devicetree board
+```
+- Compile overlay
+```
+# Biên dịch dts -> dtb
+dtc -@ -I dts -O dtb -o overlay.dtbo overlay.dts
 ```
 
 
