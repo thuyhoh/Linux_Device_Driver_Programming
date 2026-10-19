@@ -1,34 +1,39 @@
-# Character Driver
-## I. khái niệm
-- Character Device File là một loại tệp đặc biệt trong hệ điều hành Unix/Linux dùng để giao tiếp với thiết bị phần cứng theo kiểu truyền dữ liệu từng ký tự (byte) một cách tuần tự.
-- Các thiết bị được đại diện bởi các tệp đặc biệt trong thư mục
-### Chuẩn cấu trúc Character Device
-- cấp phát device number
-- khởi tạo cdev struct
-- thêm cdev vào system
-- khởi tạo /sys/class/...
-- khởi tạo /dev/...
+# Character driver
 
-## II. Device number
-- Device number: là các giá trị số nguyên được sử dụng để nhận diện và quản lý các thiết bị (devices) trong hệ thống, đặc biệt là trong giao tiếp với kernel thông qua các tệp đặc biệt trong thư mục.
-- Nó bao gồm major number và minor number:
-  - Major number: Xác định loại Kernel driver nào phụ trách tương tác thiết bị
-  - Minor Number: phân biệt giữa các thiết bị cùng sử dụng chung 1 driver
-### 1. Device number representation
-- Macro xác định major_number(12 bit) và minor_number(20 bit) thông qua device_number(dev_t => uint32_t) nằm trong thư viện`include/linux/kdev_t.h`
+## I. Giới thiệu chung
+
+- Character Driver (trình điều khiển thiết bị ký tự) là một loại Linux device driver cho phép chương trình ở không gian người dùng (User Space) giao tiếp với thiết bị hoặc tài nguyên thông qua giao diện đọc/ghi dữ liệu theo luồng byte.
+
+Character Driver hoạt động như thế nào?
+
+![char_work](imgs/char_work.png)
+
+## II. Cách viết character driver cơ bản
+- Cấp phát device number
+- Đăng ký cdev vào kernel
+- Tạo class trong /sys/
+- Tạo device node
+
+### 1. Cấp phát device number
+- `include/linux/kdev_t.h`
+#### Cấp phát tĩnh
+```
+/** 
+	from: Số hiệu thiết bị cụ thể do bạn tự tạo ra (thường kết hợp bằng hàm MKDEV(major, minor)).
+	count: Số lượng thiết bị liên tiếp.
+	name: Tên thiết bị trong /proc/devices 
+ **/
+int register_chrdev_region(dev_t from, unsigned int count, const char *name);
+```
+
 ``` C
-dev_t device_number;
-int minor_no = MINOR(device_number);
-int major_no = MAJOR(device_number);
+dev_t dev_num;
+dev_num = MKDEV(240, 0); 
+register_chrdev_region(dev_num, 1, "my_device");
 ```
-- Ghép major_number và minor_number thành device_number 
-```C
-MKDEV(int major, int minor);
-```
-### 2. Dynamically register a range of char device numbers
-- Cấp phát device number có thể sử dụng một trong hai cách:
-- Cấp phát device number. Phương thức cấp phát cho device number nằm trong thư viện: `linux/fs.h`
 
+#### Cấp phát động
+- Cấp phát động trong __init 
 ``` C
 /**
  * @brief: một hàm trong Linux Kernel dùng để đăng ký ngả (range) số thiết bị ký tự một cách động, thay vì phải chỉ định cố định major number trong mã nguồn
@@ -39,10 +44,7 @@ MKDEV(int major, int minor);
  **/
 int alloc_chrdev_region(dev_t *dev, unsigned baseminor, unsigned count, const char *name);
 ```
-
-![P1](./imgs/P1.png)
-
-### 3. Unallocate device number 
+- Huy cấp phát trong __exit
 ``` C
 /**
  * @brief: hàm kernel dùng để hủy đăng ký (giải phóng) vùng số thiết bị (device number region) mà bạn đã cấp phát trướ
@@ -51,24 +53,15 @@ int alloc_chrdev_region(dev_t *dev, unsigned baseminor, unsigned count, const ch
 **/
 void unregister_chrdev_region(dev_t from, unsigned count);
 ```
+#### Lấy thông tin devuce number
 
-## III. Char Device Registration
-- `include/linux/cdev.h`
-- cdev struct
-![P6](./imgs/P6.png)
-### 1. THIS_MODULE macro
-- THIS_MODULE là một macro trong Linux kernel, dùng bên trong mã kernel module để chỉ chính module hiện tại.
-- `include/linux/export.h`
 ``` C
-#ifdef MODULE
-extern struct module __this_module;
-#define THIS_MODULE (&__this_module)
-#else
-#define THIS_MODULE ((struct module *)0)
-#endif
+int minor_no = MINOR(device_number);
+int major_no = MAJOR(device_number);
 ```
-
-### 2. Initialize a cdev structure
+### 2. Đăng ký cdev
+- `include/linux/cdev.h`
+#### Liên kết cấu trúc cdev với file_operations
 ``` C
 /**
  * @brief: khởi tạo một cấu trúc cdev
@@ -77,7 +70,140 @@ extern struct module __this_module;
 */
 void cdev_init(struct cdev *cdev, const struct file_operations *fops);
 ```
-### 3. Add a char device to the Kernel VFS
+
+##### File_operations
+- Cấu trúc chứa các con trỏ hàm mà kernel sử dụng để gọi những hàm xử lý của driver khi chương trình user space thao tác với thiết bị.
+``` C
+static const struct file_operations fops = {
+    .owner   = THIS_MODULE,
+    .open    = drv_open,
+    .release = drv_release,
+    .read    = drv_read,
+    .write   = drv_write,
+    .llseek  = drv_llseek, 
+    // ....
+};
+```
+- Khi một tiến trình ở User Space gọi các hàm tiêu chuẩn như open(), read(), write(), hay close() trên file thiết bị "/dev/my_device", VFS (Virtual File System) sẽ tra cứu bảng fops của driver này để biết hàm nào trong Kernel cần được thực thi.
+###### open
+``` C
+static int drv_open(struct inode *inode, struct file *file) 
+{
+    pr_info("open was successful\n");
+    return 0;
+}
+```
+###### release
+``` C
+static int drv_release(struct inode *inode, struct file *file)
+{
+    pr_info("release was successful\n");
+    return 0;
+}
+```
+###### read
+``` C
+static ssize_t drv_read(struct file *file, char __user *buf, size_t len, loff_t *offset) 
+{
+    pr_info("Read requested for %zu bytes \n",count);
+	pr_info("Current file position = %lld\n",*f_pos);
+
+    if((*f_pos + count) > DEV_MEM_SIZE)
+		count = DEV_MEM_SIZE - *f_pos;
+
+    if(copy_to_user(buff,&device_buffer[*f_pos],count)){
+		return -EFAULT;
+	}
+
+    *f_pos += count;
+
+	pr_info("Number of bytes successfully read = %zu\n",count);
+	pr_info("Updated file position = %lld\n",*f_pos);
+
+    return count;
+}
+```
+- copy_to_user: đẩy dữ liệu từ bộ đệm của kernel lên bộ đệm mà ứng dụng yêu cầu.
+``` C
+/**
+ * to: Con trỏ phía User-space (__user *) nhận dữ liệu.
+ * from: Con trỏ phía Kernel-space chứa dữ liệu nguồn (ví dụ: mảng device_buffer của bạn).
+ * n: Số lượng byte cần sao chép.
+ * @retval:  = 0: Sao chép thành công toàn bộ số byte yêu cầu.
+ *          != 0: Số lượng byte chưa thể sao chép do lỗi vùng nhớ
+*/
+unsigned long copy_to_user(void __user *to, const void *from, unsigned long n);
+```
+###### write
+``` C
+ssize_t drv_write(struct file *filp, const char __user *buff, size_t count, loff_t *f_pos)
+{
+	pr_info("Write requested for %zu bytes\n",count);
+	pr_info("Current file position = %lld\n",*f_pos);
+
+	if((*f_pos + count) > DEV_MEM_SIZE)
+		count = DEV_MEM_SIZE - *f_pos;
+
+	if(!count){
+		pr_err("No space left on the device \n");
+		return -ENOMEM;
+	}
+
+	if(copy_from_user(&device_buffer[*f_pos],buff,count)){
+		return -EFAULT;
+	}
+
+	*f_pos += count;
+
+	pr_info("Number of bytes successfully written = %zu\n",count);
+	pr_info("Updated file position = %lld\n",*f_pos);
+
+	return count;
+}
+```
+- copy_from_user: hận dữ liệu từ ứng dụng user-space gửi xuống lưu vào bộ đệm của driver.
+``` C
+/**
+ * to: Con trỏ phía Kernel-space nhận dữ liệu
+ * from: Con trỏ phía User-space (__user *) nhận dữ liệu.
+ * n: Số lượng byte cần sao chép.
+ * @retval:  = 0: Sao chép thành công toàn bộ số byte yêu cầu.
+ *          != 0: Số lượng byte chưa thể sao chép do lỗi vùng nhớ
+*/
+unsigned long copy_from_user(void *to, const void __user *from, unsigned long n);
+```
+
+###### llseek
+``` C
+static loff_t drv_llseek(struct file *file, loff_t offset, int whence){
+    loff_t new_pos;
+    switch (whence) {
+        case SEEK_SET:
+            new_pos = offset;
+            break;
+
+        case SEEK_CUR:
+            new_pos = file->f_pos + offset;
+            break;
+
+        case SEEK_END:
+            new_pos = data_len + offset;
+            break;
+
+        default:
+            return -EINVAL;
+    }
+    if (new_pos < 0 || new_pos > BUFFER_SIZE) {
+        return -EINVAL; 
+    }
+    file->f_pos = new_pos;
+    pr_info("New value of the file position = %lld\n", new_pos);
+    return new_pos;
+}
+```
+
+
+#### Đăng ký Character Device vào kernel VFS
 ``` C
 /**
  * @brief: đăng ký character device vào hệ thống thiết bị (device model) của Linux.
@@ -88,21 +214,15 @@ void cdev_init(struct cdev *cdev, const struct file_operations *fops);
 */
 int cdev_add(struct cdev *p, dev_t dev, unsigned count);
 ```
-### 4. Delete cdev struct
+
+#### Hủy cấp phát trong cdev 
 ``` C
-/**
- * @param[in] cdev:
-*/
 cdev_del(struct cdev_t *cdev);
 ```
+### 3. Tạo class trong /sys/
 
-## IV. Device file
-- `include/linux/device.h`
-- Trong linux, ta có thể tạo device file một cách tự động 
-- Đối với mỗi file /sys/class/dev tượng trưng cho 
-#### udev 
-### Create and register a class with sysfs
-``` C
+#### Cấp phát động class
+```C
 /**
  * @brief: tạo một "class" thiết bị trong /sys/class, nhằm hỗ trợ việc tạo device node tự động trong /dev
  * @param[in] owner: Thường là THIS_MODULE, chỉ ra module nào sở hữu class này. 
@@ -111,16 +231,19 @@ cdev_del(struct cdev_t *cdev);
 */
 struct class *class_create(struct module *owner, const char *name);
 ```
-### Destroys a struct class structure
+#### Hủy cấp phát
 ``` C
-/**
-  *
-*/
 void class_destroy(struct class *cls);
 ```
 
+#### Kiểm tra kết quả
+``` sh
+ls /sys/class/my_char_driver
+```
 
-### Dynamic device file creation 
+### 4. Tạo device node
+-`include/linux/device.h`
+#### Cấp phát động device node
 ``` C
 /**
  * @param[in] class:	Con trỏ tới class mà bạn đã tạo từ class_create().
@@ -132,63 +255,14 @@ void class_destroy(struct class *cls);
 struct device *device_create(struct class *class, struct device *parent,
                              dev_t devt, void *drvdata, const char *fmt, ...);
 ```
-### Remove a device
+#### Hủy cấp phát 
 ``` C
 void device_destroy(struct class *class, dev_t devt);
 ```
 
-## V. File operation modthods
-- character driver sẽ hỗ trợ xử lý cho các lệnh gọi hệ thống người dùng: open, close, read, write, llseek.
-- `include/linux/fs.h`
-
-### 1. file operation structure
-![P5](./imgs/P5.png)
-### 2. Data copying between Kernel space and user space
-- dữ liệu không thể tự trao đổi giữa kernel và user một cách bình thường mà phải thông qua các hàm chuyên dụng như copy_to_user, copy_from_user.
-- Vai trò của hai hàm này:
-  - Sao chép dữ liệu giữa không gian người dùng và không gian hạt nhân
-  - Kiểm tra xem con trỏ không gian người dùng có hợp lệ hay không
-  - Nếu con trỏ không hợp lệ, không thực hiện sao chép.
-  - Nếu gặp địa chỉ không hợp lệ trong quá trình sao chép, chỉ một phần dữ liệu được sao chép. Trong cả hai trường hợp, giá trị trả về là lượng bộ nhớ vẫn cần được sao chép
-#### 2.1 __user macro
-- Đây là một macro được sử dụng với các con trỏ cấp người dùng, báo cho nhà phát triển biết rằng không nên tin tưởng hoặc coi đó là một con trỏ hợp lệ để tránh các lỗi trong nhân hệ điều hành.
-
-- GCC không quan tâm bạn có sử dụng macro __user với con trỏ cấp người dùng hay không. Điều này được kiểm tra bởi sparse, một công cụ kiểm tra ngữ nghĩa của nhân Linux, để tìm các lỗi lập trình có thể xảy ra.
-#### 2.2 copy_to_user
-``` C
-unsigned long copy_to_user(void __user *to, const void *from, unsigned long n);
+#### Kiểm tra kết quả
+``` sh
+ls /dev/my_char_driver
 ```
-#### 2.3 Copy_from_user
-``` C
-unsigned long copy_from_user(void *to, const void __user *from, unsigned long n);
-```
-![P4](./imgs/P4.png)
 
-- `include/linux/uaccess.h`
-
-
-
-### open systemcall
-#### Inode object
- Unix makes a clear distinction between the contents of a file and the information 
-about a file
-• An inode is a VFS data structure(struct inode) that holds general information about a 
-file. 
-• Whereas VFS ‘file’ data structure (struct file) tracks interaction on an opened file by 
-the user process 
-• Inode contains all the information needed by the filesystem to handle a file.
-• Each file has its own inode object, which the filesystem uses to identify the file
-• Each inode object is associated with an inode number, which uniquely identifies the 
-file within the filesystem.
-• The inode object is created and stored in memory as and when a new file (regular or 
-device ) gets created
-#### File object
-Whenever a file is opened a file object is created in the kernel space . 
-There will one file object for every open of a regular or device file.
-• Stores information about the interaction between an open file and a 
-process
-• This information exists only in kernel memory during the period when 
-a process has the file open. The contents of file object is NOT written 
-back to disks unlike inode.
-### open systemcall sequance
-![P3](./imgs/P3.png)
+cat /npro
