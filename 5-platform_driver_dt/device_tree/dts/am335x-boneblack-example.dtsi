@@ -1,0 +1,10 @@
+/{
+    pcd1: pcdev-1{
+        size = <512>
+        status = "okay"
+    };
+    pcd2: pcdev-2{
+        size = <1024>
+        status = "okay"
+    };
+};
