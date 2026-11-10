@@ -1,7 +1,12 @@
-/{
-    my_device1: device-1{
-        compatible = "demo-device";
-        size = <512>;
+/ {
+    demo_device {
+        compatible = "mycompany,demo-device";
+
+        demo,serial-number = "DEMO001";
+        demo,buffer-size = <512>;
+        demo,channels = <1 3 5>;
+        demo,enable-feature;
+
         status = "okay";
     };
 };

@@ -3,18 +3,27 @@
 
 /{
     fragment@0{
-        target = <&pcd1>;
-        # target-path = "/pcd-device-1";
-        __overlay__{
-            size = <256>;
+        target-path = "/";
+        __overlay__ {
+            bone_led {
+                compatible = "org,bone-gpio-sysfs";
+                serial-num = "ABCDE123";
+                status = "okay";
+                size = <1024>;
+                enable-feature;
+                gpio_1 {
+                    label = "gpio1.22";
+                    bone-gpios = <&gpio1 21 0>;
+                };
+            };
         };
     };
 
-    fragment@1{
-        target = <&pcd2>;
-        # target-path = "/pcd-device-2";
+    fragment@0{
+        target-path="/demo_device";
         __overlay__{
-            size = <2048>;
+            demo,serial-number="DEMODEVA";
+            demo,buffer-size=1024;
         };
     };
 };
