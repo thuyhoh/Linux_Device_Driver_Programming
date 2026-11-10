@@ -261,6 +261,8 @@ void device_destroy(struct class *class, dev_t devt);
 ```
 
 #### Kiểm tra kết quả
+- Khi module được insmod lên kernel. Hệ thống sẽ tạo ra đường dẫn /dev/my_char_driver
+- quá trình thao tác file trên /dev/my_char_driver sẽ gọi các callback trong file operations(read/write/llseek/close..)
 ``` sh
 ls /dev/my_char_driver
 ```
