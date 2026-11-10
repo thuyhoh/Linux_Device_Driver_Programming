@@ -17,6 +17,6 @@ module_init(helloworld_init);
 module_exit(helloworld_cleanup);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Kiran Nayak");
+MODULE_AUTHOR("Thuy");
 MODULE_DESCRIPTION("A simple hello world kernel module");
 MODULE_INFO(board,"Beaglebone black REV A5");
