@@ -1,0 +1,8 @@
+menu "Hello kernel module"
+
+config HELLO_LKM
+    tristate "My hello kernel module"
+    default n
+    help
+        Say Y here if you want to support My Custom Subsystem hardware. If unsure, say M (module).
+endmenu

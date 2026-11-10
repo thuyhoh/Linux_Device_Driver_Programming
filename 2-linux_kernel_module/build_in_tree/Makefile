@@ -1,21 +1,12 @@
-obj-y:=hello_kernel_module.o
-
-CC:=arm-linux-gnueabihf-
-ARCH:=arm
+obj-$(CONFIG_HELLO_LKM) += hello_kernel_module.o
+CROSS_COMPILE := /home/thuy/embedded/embedded_linux/bbb/downloads/bb-kernel/dl/gcc-8.5.0-nolibc/arm-linux-gnueabi/bin/arm-linux-gnueabi-
+KERNEL := /home/thuy/embedded/embedded_linux/bbb/downloads/bb-kernel/KERNEL/
 CFLAGS:=-Wall
-PATH:=/home/user/
-#set KERN_DIR to linux source location 
-KERNEL_DIR:=~/workspace/ldd/source/bb-kernel/KERNEL
-HOST_KERN_DIR=/lib/modules/$(shell uname -r)/build/
+PWD  := $(shell pwd)
 
 all:
-	make ARCH=$(ARCH) CROSS_COMPILE=$(CC) -C $(KERNEL_DIR) M=$(PWD) modules
+	make ARCH=arm CROSS_COMPILE=${CROSS_COMPILE} -C ${KERNEL} M=$(PWD) modules
 clean:
-	make -C $(HOST_KERN_DIR) M=$(PWD) clean
-	make ARCH=$(ARCH) CROSS_COMPILE=$(CC) -C $(KERNEL_DIR) M=$(PWD) clean
-install:
-	make ARCH=$(ARCH) CROSS_COMPILE=$(CC) -C $(KERNEL_DIR) M=$(PWD) INSTALL_MOD_PATH=$(PATH) modules_install
-help:
-	make ARCH=$(ARCH) CROSS_COMPILE=$(CC) -C $(KERNEL_DIR) M=$(PWD) help
+	make -C ${KERNEL} M=$(PWD) clean
 
-# arm-linux-gnueabihf-objectdump -h main.ko hiển thị debug bộ nhớ dưới dạng các section
+
