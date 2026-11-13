@@ -1,0 +1,15 @@
+/dts-v1/;
+/plugin/;
+
+/{
+    fragment@0{
+        target-path = "/";
+        __overlay__ {
+            my_new_device{
+                compatible = "org,bone-gpio-sysfs";
+                label = "hello";
+                size = <512>;
+            };
+        };
+    };
+};
