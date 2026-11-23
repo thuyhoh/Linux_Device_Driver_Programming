@@ -1,0 +1,30 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+    fragment@0 {
+        target = <&am33xx_pinmux>;
+        __overlay__ {
+            btn_irq_pins: btn_irq_pins {
+                pinctrl-single,pins = <
+                    0x078 0x37 /* P9_12 / GPIO1_28: INPUT, PULLUP, MODE7 */
+                >;
+            };
+        };
+    };
+    fragment@1 {
+        target-path = "/";
+        __overlay__ {
+            my_irq_button {
+                compatible = "custom,bbb-gpio-irq";
+                pinctrl-names = "default";
+                pinctrl-0 = <&btn_irq_pins>;
+                gpios = <&gpio1 28 0>; /* GPIO_ACTIVE_HIGH */
+                interrupt-parent = <&gpio1>;
+                interrupts = <28 2>; /* IRQ_TYPE_EDGE_FALLING = 2 */
+                status = "okay";
+            };
+        };
+    };
+};
+
