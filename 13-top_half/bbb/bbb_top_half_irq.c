@@ -35,7 +35,7 @@ static int bbb_irq_probe(struct platform_device *pdev)
 
 	atomic_set(&dev->irq_count, 0);
 
-	dev->btn_gpiod = devm_gpiod_get(&pdev->dev, NULL, GPIOD_IN);
+	dev->btn_gpiod = devm_gpiod_get(&pdev->dev, "irq", GPIOD_IN);
 	if (IS_ERR(dev->btn_gpiod)) {
 		dev_err(&pdev->dev, "Failed to get GPIO descriptor\n");
 		return PTR_ERR(dev->btn_gpiod);
@@ -47,11 +47,7 @@ static int bbb_irq_probe(struct platform_device *pdev)
 		return dev->irq;
 	}
 
-	ret = request_irq(dev->irq,
-			  bbb_button_top_half,
-			  IRQF_TRIGGER_FALLING,
-			  "bbb_btn_top_half",
-			  dev);
+	ret = request_irq(dev->irq, bbb_button_top_half, IRQF_TRIGGER_FALLING, "bbb_btn_top_half", dev);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to request IRQ %d: %d\n", dev->irq, ret);
 		return ret;

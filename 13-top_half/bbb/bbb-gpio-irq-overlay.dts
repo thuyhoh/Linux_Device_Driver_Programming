@@ -1,27 +1,32 @@
 /dts-v1/;
 /plugin/;
 
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/pinctrl/am33xx.h>
+
 / {
+    compatible = "ti,am335x-bone-black", "ti,am335x-bone";
+
     fragment@0 {
         target = <&am33xx_pinmux>;
         __overlay__ {
-            btn_irq_pins: btn_irq_pins {
+            /* Pad offset 0x30 = P8_12 (gpmc_ad12), mux mode 7 = GPIO1_12 */
+            my_irq_pins_default: my_irq_pins_default {
                 pinctrl-single,pins = <
-                    0x078 0x37 /* P9_12 / GPIO1_28: INPUT, PULLUP, MODE7 */
+                    AM33XX_PADCONF(AM335X_PIN_GPMC_AD12, PIN_INPUT_PULLUP, MUX_MODE7)
                 >;
             };
         };
     };
+
     fragment@1 {
         target-path = "/";
         __overlay__ {
-            my_irq_button {
+            my_irq_dev {
                 compatible = "custom,bbb-gpio-irq";
                 pinctrl-names = "default";
-                pinctrl-0 = <&btn_irq_pins>;
-                gpios = <&gpio1 28 0>; /* GPIO_ACTIVE_HIGH */
-                interrupt-parent = <&gpio1>;
-                interrupts = <28 2>; /* IRQ_TYPE_EDGE_FALLING = 2 */
+                pinctrl-0 = <&my_irq_pins_default>;
+                irq-gpios = <&gpio1 12 GPIO_ACTIVE_LOW>;
                 status = "okay";
             };
         };
