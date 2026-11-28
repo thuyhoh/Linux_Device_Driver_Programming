@@ -5,6 +5,42 @@
 #include <linux/device.h>
 #include <linux/slab.h>
 #include <linux/string.h>
+#include <linux/interrupt.h>
+
+struct my_spi_priv {
+	struct spi_device *spi;
+	u8 *tx_buf;
+	u8 *rx_buf;
+};
+
+static irqreturn_t my_spi_irq_top(int irq, void *dev_id)
+{
+	struct my_spi_priv *priv = dev_id;
+
+	if (!priv)
+		return IRQ_NONE;
+
+	return IRQ_WAKE_THREAD;
+}
+
+static irqreturn_t my_spi_irq_thread(int irq, void *dev_id)
+{
+	struct my_spi_priv *priv = dev_id;
+	int ret;
+
+	/* Ví dụ: gửi 1 byte lệnh đọc trạng thái/dữ liệu và nhận 2 byte */
+	priv->tx_buf[0] = 0x01;
+	ret = spi_write_then_read(priv->spi, priv->tx_buf, 1, priv->rx_buf, 2);
+	if (ret < 0) {
+		dev_err(&priv->spi->dev, "SPI read in IRQ thread failed: %d\n", ret);
+		return IRQ_NONE;
+	}
+
+	dev_dbg(&priv->spi->dev, "IRQ data: 0x%02x 0x%02x\n",
+		priv->rx_buf[0], priv->rx_buf[1]);
+
+	return IRQ_HANDLED;
+}
 
 static void spidev_printinfo(struct spi_device *spi)
 {
@@ -61,7 +97,20 @@ static int spidev_send_hello(struct spi_device *spi)
 
 static int spidev_probe(struct spi_device *spi)
 {
+	struct my_spi_priv *priv;
 	int ret;
+
+	priv = devm_kzalloc(&spi->dev, sizeof(*priv), GFP_KERNEL);
+	if (!priv)
+		return -ENOMEM;
+
+	priv->tx_buf = devm_kzalloc(&spi->dev, 8, GFP_KERNEL);
+	priv->rx_buf = devm_kzalloc(&spi->dev, 8, GFP_KERNEL);
+	if (!priv->tx_buf || !priv->rx_buf)
+		return -ENOMEM;
+
+	priv->spi = spi;
+	spi_set_drvdata(spi, priv);
 
 	spidev_printinfo(spi);
 
@@ -78,6 +127,20 @@ static int spidev_probe(struct spi_device *spi)
 	ret = spidev_send_hello(spi);
 	if (ret < 0)
 		return ret;
+
+	if (spi->irq > 0) {
+		ret = devm_request_threaded_irq(&spi->dev, spi->irq,
+						my_spi_irq_top,
+						my_spi_irq_thread,
+						IRQF_ONESHOT,
+						dev_name(&spi->dev),
+						priv);
+		if (ret < 0) {
+			dev_err(&spi->dev, "Failed to request IRQ %d: %d\n",
+				spi->irq, ret);
+			return ret;
+		}
+	}
 
 	return 0;
 }

@@ -40,7 +40,7 @@
                         <&gpio1 17 GPIO_ACTIVE_LOW>;
 
 			spi-dev0@0{
-                compatible = "thuy,spi-dev-0";
+                compatible = "company,spi-sample";
                 reg = <0>;
                 /*  
                     spi-cpol;
@@ -50,8 +50,8 @@
                     spi-3wire; 
                 */
                 spi-max-frequency = <10000000>;
-                /* interrupt-parent = <&gpio1>;
-	            interrupts = <18 IRQ_TYPE_EDGE_FALLING>; // GPIO1_18*/
+                interrupt-parent = <&gpio1>;
+	            interrupts = <18 IRQ_TYPE_EDGE_FALLING>; // GPIO1_18
 
             };
             spi-dev1@1{
