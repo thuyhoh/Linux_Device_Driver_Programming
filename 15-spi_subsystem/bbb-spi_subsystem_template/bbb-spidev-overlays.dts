@@ -1,0 +1,70 @@
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/pinctrl/am33xx.h>
+#include <dt-bindings/gpio/gpio.h>
+
+/ {
+	compatible = "ti,beaglebone", "ti,beaglebone-black";
+
+	fragment@0 {
+		target = <&am33xx_pinmux>;
+		__overlay__ {
+			spidev_pins: spidev-pins-pins {
+				pinctrl-single,pins = <
+					AM33XX_PADCONF(AM335X_PIN_SPI0_SCLK, PIN_INPUT_PULLUP, MUX_MODE0) /* P9_22: spi0_sclk, MUX mode 0, input enabled */	
+					AM33XX_PADCONF(AM335X_PIN_SPI0_D0, PIN_INPUT_PULLUP, MUX_MODE0) /* P9_21: spi0_d0 (MISO), MUX mode 0, input enabled */
+					AM33XX_PADCONF(AM335X_PIN_SPI0_D1, PIN_OUTPUT_PULLUP, MUX_MODE0) /* P9_18: spi0_d1 (MOSI), MUX mode 0 */		
+					AM33XX_PADCONF(AM335X_PIN_SPI0_CS0, PIN_OUTPUT_PULLUP, MUX_MODE0) /* P9_17: spi0_cs0, MUX mode 0 */
+				>;
+			};
+            spidev_cs_pins: spidev-cs-pins{
+                pinctrl-single,pins = <
+					AM33XX_PADCONF(AM335X_PIN_GPMC_A0, PIN_OUTPUT_PULLUP, MUX_MODE7) /* GPIO1_16 */	
+					AM33XX_PADCONF(AM335X_PIN_GPMC_A1, PIN_OUTPUT_PULLUP, MUX_MODE7) /* GPIO1_17 */
+					AM33XX_PADCONF(AM335X_PIN_GPMC_A2, PIN_OUTPUT_PULLUP, MUX_MODE7) /* GPIO1_18 */		
+            };
+		};
+	};
+
+	fragment@1 {
+		target = <&spi0>;
+		__overlay__ {
+			status = "okay";
+			pinctrl-names = "default";
+			pinctrl-0 = <&spidev_pins> ,<&>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+            cs-gpios =  <&gpio1 16 GPIO_ACTIVE_LOW>,
+                        <&gpio1 17 GPIO_ACTIVE_LOW>;
+
+			spi-dev0@0{
+                compatible = "thuy,spi-dev-0";
+                reg = <0>;
+                /*  
+                    spi-cpol;
+                    spi-cpha;
+                    spi-cs-high;
+                    spi-lsb-first;
+                    spi-3wire; 
+                */
+                spi-max-frequency = <10000000>;
+                /* interrupt-parent = <&gpio1>;
+	            interrupts = <18 IRQ_TYPE_EDGE_FALLING>; // GPIO1_18*/
+
+            };
+            spi-dev1@1{
+                compatible = "thuy,spi-dev-1";
+                reg = <1>;
+                /*...*/
+            };
+
+            /* 
+            spi-dev0@0{
+                /*...*/
+            }; 
+            */
+		};
+	};
+};
