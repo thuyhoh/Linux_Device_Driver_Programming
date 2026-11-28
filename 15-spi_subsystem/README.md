@@ -7,12 +7,41 @@
 
 
 ## II. Kiến trúc SPI subsystem trong Linux
-### 2.1. Vai trò của SPI core
-### 2.2. SPI controller driver và SPI protocol driver
-### 2.3. struct spi_*
-#### struct spi_controller
-- Đây là đối tượng kernel đại diện cho bộ điều khiển SPI.
+### 1. Vai trò của SPI core
+- SPI core (drivers/spi/spi.c) là lớp trung gian nằm giữa SPI controller driver và SPI protocol driver
+- Nhờ có SPI core, hai lớp này tách biệt hoàn toàn: controller không cần biết giao thức của ngoại vi, còn protocol driver không cần biết chi tiết thanh ghi phần cứng của từng SoC.
+```
+[ Protocol Driver / spidev ]   (tạo spi_message / spi_transfer, gọi spi_sync / spi_async)
+               │
+               ▼
+  ┌──────────────────────────┐
+  │         SPI Core         │   (tạo spi_device từ DT, match driver, xếp hàng & điều phối
+  │   (drivers/spi/spi.c)    │    giao dịch, gọi callback complete / đánh thức spi_sync)
+  └──────────────────────────┘
+               │
+               ▼
+  [ SPI Controller Driver ]    (điều khiển McSPI / SCLK / MOSI / MISO / CS / IRQ / DMA)
+```
+### 2. SPI controller driver và SPI protocol driver
 
+#### 2.1. SPI controller driver
+- Đối tượng: Khối phần cứng SPI trên SoC (ví dụ: McSPI trên TI AM335x của BeagleBone Black, SPI trên STM32/i.MX/Raspberry Pi) hoặc bộ chuyển đổi SPI/bit-banging.
+- Nhiệm vụ:
+  - Điều khiển trực tiếp thanh ghi phần cứng của controller.
+  - Sinh xung clock SCLK, điều khiển chân chọn chip CS (HW CS hoặc qua cs-gpios), truyền/nhận dữ liệu qua MOSI/MISO.
+  - Áp dụng thông số truyền thông (mode CPOL/CPHA, bits_per_word, speed_hz).
+  - Quản lý ngắt (IRQ) và DMA cho các phiên truyền nhận (spi_message / spi_transfer).
+- Thực tế sử dụng: Thường có sẵn trong kernel / BSP của vendor SoC; khi phát triển driver cho thiết bị ngoại vi, bạn hiếm khi phải tự viết lớp này.
+#### 2.2. SPI protocol driver
+- Đối tượng: Driver dành riêng cho từng chip ngoại vi gắn trên bus SPI (cảm biến IMU/ADC, màn hình LCD như ILI9341, bộ nhớ Flash/EEPROM, hoặc spidev giao tiếp với user space).
+- Nhiệm vụ:
+  - Khớp (match) với thiết bị khai báo trong Device Tree (of_match_table) hoặc bảng ID (spi_device_id), xử lý vòng đời qua probe() và remove().
+  - Định nghĩa giao thức riêng của chip: chuỗi lệnh khởi tạo, địa chỉ thanh ghi, độ trễ, giải mã dữ liệu đọc về.
+  - Đóng gói dữ liệu vào struct spi_transfer và struct spi_message, sau đó gọi spi_sync(), spi_async(), spi_write(), spi_read() hoặc spi_write_then_read() thông qua SPI core.
+- Thực tế sử dụng: Đây là lớp driver bạn viết hoặc tùy biến khi đưa một linh kiện SPI mới lên board.
+### 3. struct spi_*
+#### 3.1. struct spi_controller
+- Đây là đối tượng kernel đại diện cho bộ điều khiển SPI.
 ##### Các trường quan trọng
 | Trường | Ý nghĩa |
 | --- | --- |
@@ -22,8 +51,8 @@
 | `bits_per_word_mask` | Những kích thước SPI word được hỗ trợ |
 | `min_speed_hz`, `max_speed_hz` | Giới hạn tốc độ của controller |
 | `transfer_one` | Callback phía controller để thực hiện một transfer |
-#### struct spi_device
-- Đây là đối tượng mô tả  một thiết bị trên bus SPI trong hệ thống thiết bị của Linux.
+#### 3.2. struct spi_device
+- struct spi_device đại diện cho thiết bị do SPI core khởi tạo từ DT/board info
 - Với node:
 ```dts
 ili9341@0 {
@@ -34,6 +63,7 @@ ili9341@0 {
     dc-gpios = <&gpio1 16 GPIO_ACTIVE_HIGH>;
     reset-gpios = <&gpio1 28 GPIO_ACTIVE_LOW>;
 };
+```
 - Khi node được xử lý trên controller đã đăng ký, SPI core có thể tạo một `spi_device` tương ứng. Driver nhận con trỏ tới đối tượng đó qua:
 
 ```c
@@ -43,7 +73,7 @@ static int ili9341_probe(struct spi_device *spi)
     return 0;
 }
 ```
-- struct spi_device được dùng để Cấu hình trước khi truyền
+- `struct spi_device` được dùng để cấu hình lại thiết bị trước khi truyền
 
 
 ##### Các trường quan trọng
@@ -61,7 +91,8 @@ static int ili9341_probe(struct spi_device *spi)
 
 
 
-#### struct spi_transfer
+#### 3.3.  struct spi_transfer
+##### Các trường quan trọng
 | Trường | Ý nghĩa |
 | --- | --- |
 | `tx_buf` | Con trỏ tới dữ liệu cần gửi |
@@ -72,6 +103,7 @@ static int ili9341_probe(struct spi_device *spi)
 | `cs_change` | Yêu cầu hành vi CS đặc biệt sau transfer |
 | `delay_usecs` | Khoảng chờ sau transfer trong API Linux 5.4 |
 #### struct spi_message
+##### Các trường quan trọng
 | Trường | Vai trò |
 | --- | --- |
 | `transfers` | Danh sách liên kết chứa các transfer |
@@ -82,30 +114,101 @@ static int ili9341_probe(struct spi_device *spi)
 | `context` | Con trỏ ngữ cảnh truyền cho callback |
 
 ## III. Khai báo thiết bị bằng Device Tree
-### 3.1. Cấu hình SPI controller và pinctrl
-- pinmux SPI pins
-```
-AM33XX_PADCONF(AM335X_PIN_SPI0_SCLK, PIN_INPUT_PULLUP, MUX_MODE0) /* P9_22: spi0_sclk, MUX mode 0, input enabled */	
-AM33XX_PADCONF(AM335X_PIN_SPI0_D0, PIN_INPUT_PULLUP, MUX_MODE0) /* P9_21: spi0_d0 (MISO), MUX mode 0, input enabled */
-AM33XX_PADCONF(AM335X_PIN_SPI0_D1, PIN_OUTPUT_PULLUP, MUX_MODE0) /* P9_18: spi0_d1 (MOSI), MUX mode 0 */		
-AM33XX_PADCONF(AM335X_PIN_SPI0_CS0, PIN_OUTPUT_PULLUP, MUX_MODE0) /* P9_17: spi0_cs0, MUX mode 0 */	
-```
-### 3.2. Khai báo node thiết bị SPI
+### 3.1. Cấu hình SPI controller 
+#### Cấu hình spi pin control
+| Pin | Cấu hình |
+|:----|:---------|
+| SCLK | OUTPUT |
+| MOSI | OUTPUT |
+| MISO | INPUT  |
+| CS   | OUTPUT |
 
-### 3.3. Property
+```
+&am33xx_pinmux {
+    spi0_pins_default: spi0-pins-default {
+        pinctrl-single,pins = <
+            AM33XX_PADCONF(AM335X_PIN_SPI0_SCLK, PIN_OUTPUT_PULLUP, MUX_MODE0)
+            AM33XX_PADCONF(AM335X_PIN_SPI0_D0, PIN_OUTPUT_PULLUP, MUX_MODE0)
+            AM33XX_PADCONF(AM335X_PIN_SPI0_D1, PIN_INPUT_PULLUP, MUX_MODE0)
+            AM33XX_PADCONF(AM335X_PIN_SPI0_CS0, PIN_OUTPUT_PULLUP, MUX_MODE7)
+        >;
+    };
+};
+```
+#### Cấu hình SPI controller
+``` dts
+&spi0 {
+    status = "okay";
+    pinctrl-names = "default";
+    pinctrl-0 = <&spi0_pins_default>;
+    #address-cells = <1>;
+    #size-cells = <0>;
+    cs-gpios = <&gpio0 5 GPIO_ACTIVE_LOW>;
+	
+    /*...*/
+};
+```
+### 3.2. Khai báo node SPI device
+- SPI device node được khai báo trong spi controller
+- Mỗi device node trên cùng một spi bus khác nhau chủ yếu ở reg , compatible. Ngoài ra còn có các tham số cấu hình và tài nguyên ngoại vi   
+  - reg (Chip Select index): Phân biệt các thiết bị nằm trên cùng một bus SPI. Mỗi thiết bị trên bus phải có một số reg riêng ứng với đường CS (0, 1, 2...) mà nó dùng.
+  - compatible: Quyết định driver nào trong kernel sẽ khớp
+``` dts
+&spi0 {
+    /*...*/
+    spidev0:spi-dev0@0{
+        compatible = "cpmpany,spi-dev-0";
+        reg = <0>;
+        spi-max-frequency = <4000000>;
+        /*  interrupt-parent = <&gpio1>;
+            interrupts = <18 IRQ_TYPE_EDGE_FALLING>; // GPIO1_18 */
+    };
+    spidev1:spi-dev1@1{
+        reg = <1>;
+        /*...*/
+    };
+    /*...*/
+};
+```
+### 3.3. SPI device tree property
 #### cs-gpios
+- Khai báo chân GPIO đóng vai trò làm tín hiệu Chip Select (CS) thay vì dùng (hoặc kết hợp với) chân CS cứng của controller SPI.
+```
+cs-gpios =  <&gpio1 16 GPIO_ACTIVE_LOW>,
+            <&gpio1 17 GPIO_ACTIVE_LOW>;
+```
 #### spi-cpol & spi-cpha
-Mode 0 (CPOL=0, CPHA=0): không cần khai báo cả hai cờ.
-Mode 1 (CPOL=0, CPHA=1): chỉ thêm spi-cpha;.
-Mode 2 (CPOL=1, CPHA=0): chỉ thêm spi-cpol;.
-Mode 3 (CPOL=1, CPHA=1): thêm cả spi-cpol; và spi-cpha;.
+- Hai thuộc tính boolean (chỉ cần có mặt là bật) điều khiển cực tính xung clock (CPOL) và pha lấy mẫu dữ liệu (CPHA), quyết định SPI Mode 0–3:
+
+|MODE| Nội dung |
+|:---|:---------|
+|Mode 0 (CPOL=0, CPHA=0)| không cần khai báo cả hai cờ|
+|Mode 1 (CPOL=0, CPHA=1)| chỉ thêm spi-cpha|
+|Mode 2 (CPOL=1, CPHA=0)| chỉ thêm spi-cpol|
+|Mode 3 (CPOL=1, CPHA=1)| thêm cả spi-cpol và spi-cpha|
 #### spi-cs-high
+- Thuộc tính boolean: đảo mức tích cực của tín hiệu CS thành active-high (kéo lên mức 1 để chọn thiết bị, mặc định là active-low 0).
+- Dùng khi thiết bị ngoại vi hoặc mạch đệm/level-shifter yêu cầu CS ở mức cao khi giao tiếp.
 #### spi-lsb-first
+- Thuộc tính boolean: truyền/nhận bit theo thứ tự LSB trước (Least Significant Bit first) thay vì mặc định MSB trước (Most Significant Bit first).
 #### spi-3wire
+- Thuộc tính boolean: cấu hình chế độ SPI 3 dây (3-wire SPI / half-duplex trên một chân dữ liệu chung), trong đó đường dữ liệu dùng chung cho cả truyền và nhận thay vì tách riêng MOSI và MISO.
 #### spi-max-frequency
+- Thuộc tính bắt buộc trên đa số node thiết bị SPI: khai báo tần số xung clock tối đa (đơn vị Hz) mà thiết bị hỗ trợ trên bus này.
 
+``` dts
+spi-max-frequency = <4000000>; /* Tối đa 4 MHz */
+```
+#### Interrupt
+- Trên BeagleBone Black (BBB) dùng SoC TI AM335x khái niệm ngắt trên SPI gồm hai lớp tách biệt nhau: 
+  - `ngắt của bộ điều khiển SPI (McSPI controller IRQ)`: RX FIFO có dữ liệu nhận được, TX FIFO trống, Kết thúc phiên truyền/nhận
+  - `ngắt từ thiết bị ngoại vi gắn trên bus SPI (spi->irq)`: Thông qua một đường ngắt ngoài 
+- Device tree chỉ hỗ trợ ngắt từ ngoại vi gắn trên bus SPI thông qua kế thừa ngắt từ ngoại vi GPIO 
+```
+interrupt-parent = <&gpio1>;
+interrupts = <18 IRQ_TYPE_EDGE_FALLING>;
+```
 
-#### Khai báo interrupt, reset GPIO và nguồn cấp
 
 ## IV. SPI protocol driver
 ### 1. APIs
